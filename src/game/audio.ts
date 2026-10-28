@@ -6,7 +6,11 @@
 //  - Overrun crackles and burble on deceleration
 //  - Enclosed resonant tunnel muffling
 //  - Dual European acoustic horn and dynamic police siren
-import { GEAR_TOP, IDLE_RPM, REDLINE, pickGear } from "./gearbox";
+import { GEAR_TOP, GEARS, IDLE_RPM, REDLINE, pickGear } from "./gearbox";
+import idleWav from "@/assets/sounds/revuelto-idle.wav.asset.json";
+import loadWav from "@/assets/sounds/revuelto-load.wav.asset.json";
+import revWav from "@/assets/sounds/revuelto-rev.wav.asset.json";
+import highWav from "@/assets/sounds/revuelto-high.wav.asset.json";
 
 const MASTER = 0.82;
 const GRAIN = 0.12; // seconds
@@ -48,11 +52,11 @@ export class GameAudio {
   private idleSrc: AudioBufferSourceNode | null = null;
 
   // Real-time V12 synthesized harmonic engine nodes (guarantees instant, continuous sound)
-  private synthGain: GainNode | null = null;
-  private v12Osc1: OscillatorNode | null = null;
-  private v12Osc2: OscillatorNode | null = null;
-  private v12Osc3: OscillatorNode | null = null;
-  private v12WaveShaper: WaveShaperNode | null = null;
+  private highBuf: AudioBuffer | null = null;
+  private highSrc: AudioBufferSourceNode | null = null;
+  private highGain: GainNode | null = null;
+  private tunnelLP: BiquadFilterNode | null = null;
+  private comp: DynamicsCompressorNode | null = null;
 
   // Wind and tyre noise
   private windGain: GainNode | null = null;
@@ -113,7 +117,14 @@ export class GameAudio {
 
       this.master = ctx.createGain();
       this.master.gain.value = this.muted ? 0 : MASTER;
-      this.master.connect(comp);
+      // Tunnel muffler: everything from the car (engine, exhaust, horn) passes here
+      this.tunnelLP = ctx.createBiquadFilter();
+      this.tunnelLP.type = "lowpass";
+      this.tunnelLP.frequency.value = 18000;
+      this.tunnelLP.Q.value = 0.9;
+      this.tunnelLP.connect(comp);
+      this.master.connect(this.tunnelLP);
+      this.comp = comp;
 
       // Load (accelerating) chain: grains -> shift dip -> body EQ -> tone filter -> bus
       this.loadBus = ctx.createGain();
@@ -187,162 +198,53 @@ export class GameAudio {
       boostFilter.connect(this.boostGain);
       this.boostOsc.start();
 
-      // Synthesize realistic Lamborghini V12 sound buffers directly in-memory!
-      this.setupV12AudioBuffers(ctx);
-
-      // Real-time continuous V12 synthesizer layer
-      this.setupRealtimeV12Synth(ctx);
+      // Real recorded Revuelto V12 samples (idle loop, load pull, rev blip, redline)
+      void this.loadSamples(ctx);
     }
     void this.ctx.resume();
   }
 
-  // ---------- In-Memory Realistic Lamborghini V12 Acoustic Synthesis ----------
-  private setupV12AudioBuffers(ctx: AudioContext) {
+  // ---------- Real recorded V12 samples ----------
+  private async loadSamples(ctx: AudioContext) {
+    const get = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`audio ${res.status} ${url}`);
+      return ctx.decodeAudioData(await res.arrayBuffer());
+    };
     try {
-      // 1. Synthesize Authentic V12 Idle Loop (2 seconds seamless loop)
-      const idleLen = ctx.sampleRate * 2;
-      const idleBuf = ctx.createBuffer(1, idleLen, ctx.sampleRate);
-      const idData = idleBuf.getChannelData(0);
-      const fIdle = IDLE_HZ; // 72 Hz fundamental (Lamborghini L545 idle firing harmonic)
-
-      for (let i = 0; i < idleLen; i++) {
-        const t = i / ctx.sampleRate;
-        const phase = (t * fIdle) % 1;
-        // Asymmetric cylinder exhaust pressure pulse profile
-        const p1 = Math.sin(phase * 2 * Math.PI);
-        const p2 = Math.sin(phase * 4 * Math.PI + 0.3) * 0.65; // 2nd harmonic (bank pulse)
-        const p3 = Math.sin(phase * 6 * Math.PI + 0.6) * 0.42; // 3rd harmonic (collector merge)
-        const p6 = Math.sin(phase * 12 * Math.PI + 1.1) * 0.28; // 6th harmonic (full firing cycle)
-        // Sub-bass exhaust thrum (36 Hz sub-octave)
-        const sub = Math.sin(t * 36 * 2 * Math.PI) * 0.3;
-        // Mechanical valvetrain high-frequency rattle (480 Hz)
-        const valve = Math.sin(t * 480 * 2 * Math.PI) * 0.08 * (Math.sin(phase * 2 * Math.PI) > 0 ? 1 : 0);
-        // Slight natural cylinder-to-cylinder pressure modulation (lobed cam idle)
-        const jitter = 1 + 0.08 * Math.sin(t * 7.5 * 2 * Math.PI);
-
-        const raw = (p1 + p2 + p3 + p6 + sub + valve) * jitter;
-        idData[i] = Math.tanh(raw * 1.35) * 0.55;
-      }
-
-      // Smooth loop boundaries
-      const fadeLen = Math.floor(ctx.sampleRate * 0.05);
-      for (let i = 0; i < fadeLen; i++) {
-        const frac = i / fadeLen;
-        idData[i] = idData[i]! * frac + idData[idleLen - fadeLen + i]! * (1 - frac);
-      }
+      const [idle, load, rev, high] = await Promise.all([
+        get(idleWav.url),
+        get(loadWav.url),
+        get(revWav.url),
+        get(highWav.url),
+      ]);
+      if (this.ctx !== ctx) return;
+      this.loadBuf = load;
+      this.revBuf = rev;
+      this.highBuf = high;
 
       this.idleSrc = ctx.createBufferSource();
-      this.idleSrc.buffer = idleBuf;
+      this.idleSrc.buffer = idle;
       this.idleSrc.loop = true;
       this.idleSrc.connect(this.idleGain!);
       this.idleSrc.start();
 
-      // 2. Synthesize Full-Throttle V12 Load Pull Buffer (3.5s sweep from 75 Hz to 320 Hz)
-      const loadLen = Math.floor(ctx.sampleRate * 3.5);
-      const loadBuf = ctx.createBuffer(1, loadLen, ctx.sampleRate);
-      const ldData = loadBuf.getChannelData(0);
+      // Redline hold: seamless loop of the real top-rpm recording (no restart)
+      this.highGain = ctx.createGain();
+      this.highGain.gain.value = 0;
+      this.highGain.connect(this.shiftGain!);
+      this.highSrc = ctx.createBufferSource();
+      this.highSrc.buffer = high;
+      this.highSrc.loop = true;
+      this.highSrc.loopStart = 0.05;
+      this.highSrc.loopEnd = Math.max(0.1, high.duration - 0.05);
+      this.highSrc.connect(this.highGain);
+      this.highSrc.start();
 
-      let curPhase = 0;
-      for (let i = 0; i < loadLen; i++) {
-        const t = i / ctx.sampleRate;
-        const progress = t / 3.5;
-        // Frequency follows LOAD_PITCH curve from 75 Hz to 318 Hz
-        const freq = 75 + Math.pow(progress, 1.4) * (318 - 75);
-        curPhase += (freq / ctx.sampleRate) * 2 * Math.PI;
-
-        // V12 exhaust harmonic profile: screaming naturally aspirated character
-        const h1 = Math.sin(curPhase);
-        const h2 = Math.sin(curPhase * 2 + 0.25) * 0.68;
-        const h3 = Math.sin(curPhase * 3 + 0.5) * 0.48;
-        const h4 = Math.sin(curPhase * 4 + 0.7) * 0.35;
-        const h6 = Math.sin(curPhase * 6 + 1.2) * (0.2 + progress * 0.35); // high RPM metallic scream!
-        // High rev air intake resonance (1800 Hz overtone)
-        const intake = Math.sin(curPhase * 8.5) * (0.05 + progress * 0.28);
-
-        const raw = (h1 + h2 + h3 + h4 + h6 + intake) * (1 + 0.05 * (Math.random() * 2 - 1));
-        ldData[i] = Math.tanh(raw * 1.4) * 0.6;
-      }
-      this.loadBuf = loadBuf;
-
-      // 3. Synthesize Rev blip (start blip: idle -> 7500 RPM -> idle in 1.2s)
-      const revLen = Math.floor(ctx.sampleRate * 1.2);
-      const revBuf = ctx.createBuffer(1, revLen, ctx.sampleRate);
-      const rvData = revBuf.getChannelData(0);
-      let rPhase = 0;
-      for (let i = 0; i < revLen; i++) {
-        const t = i / ctx.sampleRate;
-        // Peak rev curve at t = 0.35s
-        const env = t < 0.35 ? t / 0.35 : Math.exp(-(t - 0.35) * 3.8);
-        const freq = 75 + env * 230; // up to ~305 Hz (approx 7,500 RPM)
-        rPhase += (freq / ctx.sampleRate) * 2 * Math.PI;
-
-        const h1 = Math.sin(rPhase);
-        const h2 = Math.sin(rPhase * 2) * 0.6;
-        const h3 = Math.sin(rPhase * 3) * 0.45;
-        const h6 = Math.sin(rPhase * 6) * (0.2 + env * 0.3);
-        rvData[i] = Math.tanh((h1 + h2 + h3 + h6) * 1.3) * 0.65 * (t < 0.05 ? t / 0.05 : 1);
-      }
-      this.revBuf = revBuf;
-
-      // Start the granular engine scheduler
       this.timer = setInterval(() => this.tick(), 20);
     } catch (err) {
-      console.warn("V12 audio synthesis warning:", err);
+      console.warn("Engine samples failed to load:", err);
     }
-  }
-
-  // ---------- Real-Time Synthesized V12 Harmonic Layer ----------
-  private setupRealtimeV12Synth(ctx: AudioContext) {
-    if (!this.master) return;
-
-    this.synthGain = ctx.createGain();
-    this.synthGain.gain.value = 0.32; // Active base level
-    this.synthGain.connect(this.master);
-
-    // Wave shaper for exhaust manifold throatiness
-    const shaper = ctx.createWaveShaper();
-    const curve = new Float32Array(256);
-    for (let i = 0; i < 256; i++) {
-      const x = (i * 2) / 256 - 1;
-      curve[i] = Math.tanh(x * 1.8);
-    }
-    shaper.curve = curve;
-    shaper.connect(this.synthGain);
-    this.v12WaveShaper = shaper;
-
-    // Harmonic 1 (Fundamental firing frequency)
-    this.v12Osc1 = ctx.createOscillator();
-    this.v12Osc1.type = "sawtooth";
-    this.v12Osc1.frequency.value = rpmToHz(IDLE_RPM);
-
-    // Harmonic 2 (Bank pulse)
-    this.v12Osc2 = ctx.createOscillator();
-    this.v12Osc2.type = "sawtooth";
-    this.v12Osc2.frequency.value = rpmToHz(IDLE_RPM) * 2;
-
-    // Harmonic 3 (Collector roar)
-    this.v12Osc3 = ctx.createOscillator();
-    this.v12Osc3.type = "triangle";
-    this.v12Osc3.frequency.value = rpmToHz(IDLE_RPM) * 3;
-
-    const g1 = ctx.createGain();
-    g1.gain.value = 0.45;
-    this.v12Osc1.connect(g1);
-    g1.connect(shaper);
-
-    const g2 = ctx.createGain();
-    g2.gain.value = 0.35;
-    this.v12Osc2.connect(g2);
-    g2.connect(shaper);
-
-    const g3 = ctx.createGain();
-    g3.gain.value = 0.22;
-    this.v12Osc3.connect(g3);
-    g3.connect(shaper);
-
-    this.v12Osc1.start();
-    this.v12Osc2.start();
-    this.v12Osc3.start();
   }
 
   private setupPoliceAudio(ctx: AudioContext) {
@@ -538,7 +440,7 @@ export class GameAudio {
     const now = ctx.currentTime;
     if (this.nextGrain < now) this.nextGrain = now + 0.01;
     while (this.nextGrain < now + LOOKAHEAD) {
-      if (this.loadOn) this.grain(buf, this.nextGrain);
+      if (this.loadOn && !(this.highGain && this.highGain.gain.value > 0.6)) this.grain(buf, this.nextGrain);
       this.nextGrain += HOP * rnd(0.85, 1.15);
     }
     if (now < this.crackleUntil && Math.random() < 0.32) this.pop(now + rnd(0.01, 0.05), rnd(0.2, 0.5));
@@ -612,7 +514,7 @@ export class GameAudio {
     this.pop(t + 0.06, 0.45);
   }
 
-  setEngine(speed: number, throttle: boolean, running: boolean, inTunnel = false, rain = 0) {
+  setEngine(speed: number, throttle: boolean, running: boolean, inTunnel = false, rain = 0, gear?: number) {
     const ctx = this.ctx;
     if (!ctx || !this.idleGain || !this.loadBus || !this.loadFilter || !this.windGain || !this.windFilter)
       return;
@@ -633,7 +535,7 @@ export class GameAudio {
     if (!running) {
       this.idleGain.gain.setTargetAtTime(0, t, 0.15);
       this.loadBus.gain.setTargetAtTime(0, t, 0.15);
-      if (this.synthGain) this.synthGain.gain.setTargetAtTime(0, t, 0.15);
+      if (this.highGain) this.highGain.gain.setTargetAtTime(0, t, 0.15);
       this.loadOn = false;
       this.rpm = IDLE_RPM;
       this.gear = 0;
@@ -643,7 +545,8 @@ export class GameAudio {
     }
 
     // 8-speed gearbox logic
-    const g = pickGear(this.gear, speed, throttle);
+    // Gear comes from the game (same gear the HUD shows), so sound and HUD never drift
+    const g = gear !== undefined ? clamp(gear, 0, GEARS - 1) : pickGear(this.gear, speed, throttle);
     if (g > this.gear && throttle) this.shift(t);
     this.gear = g;
 
@@ -671,24 +574,23 @@ export class GameAudio {
     this.idleGain.gain.setTargetAtTime(idleLevel, t, 0.1);
     this.loadBus.gain.setTargetAtTime(loadLevel, t, throttle ? 0.05 : 0.15);
 
-    // Realtime harmonic V12 synthesizer frequencies and volume
-    if (this.v12Osc1 && this.v12Osc2 && this.v12Osc3 && this.synthGain) {
-      const oscFreq = this.hz;
-      this.v12Osc1.frequency.setTargetAtTime(oscFreq, t, 0.06);
-      this.v12Osc2.frequency.setTargetAtTime(oscFreq * 2, t, 0.06);
-      this.v12Osc3.frequency.setTargetAtTime(oscFreq * 3, t, 0.06);
+    // Top gear at redline: hold the real redline loop steady instead of restarting grains
+    const atLimit = g === GEARS - 1 && this.rpm > REDLINE * 0.94 && throttle;
+    if (this.highGain) this.highGain.gain.setTargetAtTime(atLimit ? 0.9 : 0, t, 0.12);
+    if (this.highSrc) this.highSrc.playbackRate.setTargetAtTime(clamp(this.rpm / REDLINE, 0.9, 1.02), t, 0.1);
 
-      const synthVol = throttle ? 0.35 + rpmN * 0.35 : 0.22 + (1 - rpmN) * 0.12;
-      this.synthGain.gain.setTargetAtTime(synthVol, t, 0.08);
+    // Tone: open on throttle, softer on lift-off
+    this.loadFilter.frequency.setTargetAtTime(throttle ? 7500 : 2400, t, 0.08);
+    this.loadFilter.Q.setTargetAtTime(0.6, t, 0.08);
+
+    // Tunnel: muffle the whole car (engine, exhaust pops, horn), open again outside
+    if (this.tunnelLP) {
+      this.tunnelLP.frequency.setTargetAtTime(inTunnel ? 950 : 18000, t, inTunnel ? 0.12 : 0.35);
+      this.tunnelLP.Q.setTargetAtTime(inTunnel ? 2.2 : 0.7, t, 0.2);
     }
 
-    // Tunnel low-pass filter frequency drops for muffled hollow roar
-    const targetCutoff = inTunnel ? 1150 : throttle ? 7500 : 1200;
-    this.loadFilter.frequency.setTargetAtTime(targetCutoff, t, 0.08);
-    this.loadFilter.Q.setTargetAtTime(inTunnel ? 1.8 : 0.6, t, 0.08);
-
     if (this.idleSrc) {
-      this.idleSrc.playbackRate.setTargetAtTime(clamp(this.hz / IDLE_HZ, 0.9, 2.0), t, 0.08);
+      this.idleSrc.playbackRate.setTargetAtTime(clamp(this.rpm / IDLE_RPM, 0.95, 1.6), t, 0.08);
     }
   }
 
