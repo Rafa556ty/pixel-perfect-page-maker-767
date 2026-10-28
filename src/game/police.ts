@@ -31,3 +31,41 @@ export function policeSpeedStep(speed: number, dt: number, cap = Infinity) {
   const a = POLICE_ACCEL * (1 - (speed / POLICE_MAX) ** 2) + 4;
   return Math.min(target, speed + a * dt);
 }
+
+/**
+ * The player is caught only when the police nose hits the Lamborghini's tail:
+ * police behind (gap > 0), bumpers touching (gap < carLen) and both cars in the
+ * same lane (lateral offset under ~half a car). Passing in another lane never busts.
+ */
+export function isRearHit(gap: number, lateral: number, carLen: number, carW: number) {
+  return gap > 0 && gap < carLen && Math.abs(lateral) < carW * 0.55;
+}
+
+type Car = { lane: number; z: number; speed: number; hit?: boolean };
+
+/** Is there room for the police in `lane` around z (no car ahead within `ahead`, none behind within `behind`)? */
+export function policeLaneFree(cars: Car[], lane: number, z: number, ahead: number, behind: number) {
+  return !cars.some((c) => !c.hit && c.lane === lane && c.z - z < ahead && z - c.z < behind);
+}
+
+/**
+ * Lane the police wants: it stays behind traffic instead of driving through it,
+ * overtakes through a free neighbouring lane, and otherwise lines up with the player.
+ */
+export function choosePoliceLane(
+  cars: Car[],
+  pol: { lane: number; z: number },
+  playerLane: number,
+  o: { ahead: number; behind: number; lanes?: number },
+) {
+  const lanes = o.lanes ?? 3;
+  const blocked = !policeLaneFree(cars, pol.lane, pol.z, o.ahead, 0);
+  const prefer = [playerLane, pol.lane - 1, pol.lane + 1];
+  if (!blocked && pol.lane === playerLane) return pol.lane;
+  for (const l of prefer) {
+    if (l < 0 || l >= lanes || l === pol.lane) continue;
+    if (Math.abs(l - pol.lane) !== 1) continue; // one lane at a time
+    if (policeLaneFree(cars, l, pol.z, o.ahead, o.behind)) return l;
+  }
+  return pol.lane;
+}
