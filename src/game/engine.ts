@@ -27,11 +27,11 @@ export type HudData = {
   boostEnergy: number;
   boostActive: boolean;
   nearMissCombo: number;
-  nearMissEvent?: { combo: number; pts: number };
-  radarEvent?: { speed: number; limit: number };
-  policeGap?: number;
-  policeZone?: Zone;
-  escapeProgress?: number;
+  nearMissEvent?: { combo: number; pts: number } | undefined;
+  radarEvent?: { speed: number; limit: number } | undefined;
+  policeGap?: number | undefined;
+  policeZone?: Zone | undefined;
+  escapeProgress?: number | undefined;
 };
 
 export type GameOverOutcome = "crash" | "busted" | "escaped";
@@ -150,9 +150,9 @@ export class RacingEngine {
   private highBeamTimer = 0; // flasher duration
   private nearMissCombo = 0;
   private comboTimer = 0;
-  private lastNearMissEvent?: { combo: number; pts: number };
+  private lastNearMissEvent?: { combo: number; pts: number } | undefined;
   private nearMissEventTimer = 0;
-  private lastRadarEvent?: { speed: number; limit: number };
+  private lastRadarEvent?: { speed: number; limit: number } | undefined;
   private radarEventTimer = 0;
   private passedRadars = new Set<number>();
   private rainSprayT = 0;
