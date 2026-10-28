@@ -523,7 +523,7 @@ export class RacingEngine {
           if (latDist >= minSafe && latDist <= maxClose) {
             t.nearMissed = true;
             this.nearMissCombo += 1;
-            this.comboTimer = 3.8;
+            this.comboTimer = 3.0;
             const pts = 100 * this.nearMissCombo;
             this.boostEnergy = Math.min(100, this.boostEnergy + 18);
             this.lastNearMissEvent = { combo: this.nearMissCombo, pts };
@@ -698,8 +698,9 @@ export class RacingEngine {
       const gapNow = this.pz - pol.z;
       const ps = this.player.speed;
       if (this.phase === "busted") {
-        // Roadblock done: police stops in front of the Lamborghini
-        pol.speed = this.player.speed * 0.98;
+        // Roadblock done: the GT3 RS brakes to a stop in front, no crash
+        pol.speed = Math.max(0, pol.speed - 150 * dt);
+        pol.lane = pLane;
         this.player.spin = 0;
         this.player.rot *= Math.exp(-4 * dt);
       } else {
