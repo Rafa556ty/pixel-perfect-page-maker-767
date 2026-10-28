@@ -253,27 +253,26 @@ export class GameAudio {
     this.policeGain.connect(this.master);
 
     const sirenFilter = ctx.createBiquadFilter();
-    sirenFilter.type = "bandpass";
-    sirenFilter.frequency.value = 850;
-    sirenFilter.Q.value = 1.6;
-    sirenFilter.connect(this.policeGain);
+    sirenFilter.type = "lowpass";
+    sirenFilter.frequency.value = 1500;
+    sirenFilter.Q.value = 0.5;
 
     this.sirenOsc = ctx.createOscillator();
-    this.sirenOsc.type = "sawtooth";
-    this.sirenOsc.frequency.value = 750;
+    this.sirenOsc.type = "triangle";
+    this.sirenOsc.frequency.value = 720;
 
     this.sirenLfo = ctx.createOscillator();
     this.sirenLfo.type = "sine";
-    this.sirenLfo.frequency.value = 1.4;
+    this.sirenLfo.frequency.value = 0.5;
 
     this.sirenLfoGain = ctx.createGain();
-    this.sirenLfoGain.gain.value = 240;
+    this.sirenLfoGain.gain.value = 170;
 
     this.sirenLfo.connect(this.sirenLfoGain);
     this.sirenLfoGain.connect(this.sirenOsc.frequency);
 
     const sirenToneGain = ctx.createGain();
-    sirenToneGain.gain.value = 0.28;
+    sirenToneGain.gain.value = 0.5;
     this.sirenOsc.connect(sirenFilter);
     sirenFilter.connect(sirenToneGain);
     sirenToneGain.connect(this.policeGain);
@@ -407,12 +406,12 @@ export class GameAudio {
 
     // Volume grows smoothly as the police closes in; capped so the V12 stays on top
     const near = clamp(1 - gap / 520, 0, 1);
-    const vol = 0.02 + 0.36 * near ** 1.7;
-    const lfoRate = 1.2 + near * 2.4;
-    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.4), t, 0.25);
+    const vol = 0.015 + 0.2 * near ** 1.8;
+    const lfoRate = 0.45 + near * 0.35;
+    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.22), t, 0.3);
     this.sirenLfo.frequency.setTargetAtTime(lfoRate, t, 0.2);
 
-    const engVol = gap < 120 ? clamp((1 - gap / 120) * 0.22, 0, 0.22) : 0;
+    const engVol = gap < 120 ? clamp((1 - gap / 120) * 0.1, 0, 0.1) : 0;
     this.policeEngineGain.gain.setTargetAtTime(engVol, t, 0.15);
   }
 
