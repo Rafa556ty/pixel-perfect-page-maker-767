@@ -440,8 +440,21 @@ export class RacingEngine {
         }
         p.vx = 0;
       }
+    } else if (this.phase === "busted") {
+      // PRESO: the car brakes automatically until it stops — no explosion
+      p.speed = Math.max(0, p.speed - 150 * dt);
+      p.rot *= Math.exp(-6 * dt);
+      p.spin = 0;
+      p.vx *= Math.exp(-6 * dt);
+      p.x = clamp(p.x, minX, maxX);
+      this.crashT += dt;
+      if (p.speed <= 0.5 && this.crashT > 0.5) {
+        this.phase = "over";
+        this.gameOverOutcome = "busted";
+        this.cb.onGameOver({ distance: this.distance, topSpeed: this.topSpeed, outcome: "busted" });
+      }
     } else {
-      // Crashed / Busted / Escaped ending dynamics
+      // Crashed / Escaped ending dynamics
       p.speed *= Math.exp(-1.8 * dt);
       if (p.speed < 1) p.speed = 0;
       p.rot += p.spin * dt;
@@ -460,8 +473,8 @@ export class RacingEngine {
         const r = p.h * 0.22;
         this.emitSmoke(p.x - Math.sin(p.rot) * r, this.baseY + Math.cos(p.rot) * r, this.crashT < 2 && Math.random() < 0.35);
       }
-      if ((this.phase === "crashed" || this.phase === "busted" || this.phase === "escaped") && this.crashT > 1.4) {
-        const out = this.phase === "crashed" ? "crash" : this.phase === "busted" ? "busted" : "escaped";
+      if ((this.phase === "crashed" || this.phase === "escaped") && this.crashT > 1.4) {
+        const out = this.phase === "crashed" ? "crash" : "escaped";
         this.phase = "over";
         this.gameOverOutcome = out;
         this.cb.onGameOver({ distance: this.distance, topSpeed: this.topSpeed, outcome: out });
