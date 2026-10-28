@@ -254,19 +254,19 @@ export class GameAudio {
 
     const sirenFilter = ctx.createBiquadFilter();
     sirenFilter.type = "lowpass";
-    sirenFilter.frequency.value = 1500;
+    sirenFilter.frequency.value = 2600;
     sirenFilter.Q.value = 0.5;
 
     this.sirenOsc = ctx.createOscillator();
     this.sirenOsc.type = "triangle";
-    this.sirenOsc.frequency.value = 720;
+    this.sirenOsc.frequency.value = 1000;
 
     this.sirenLfo = ctx.createOscillator();
     this.sirenLfo.type = "sine";
-    this.sirenLfo.frequency.value = 0.5;
+    this.sirenLfo.frequency.value = 0.3;
 
     this.sirenLfoGain = ctx.createGain();
-    this.sirenLfoGain.gain.value = 170;
+    this.sirenLfoGain.gain.value = 380;
 
     this.sirenLfo.connect(this.sirenLfoGain);
     this.sirenLfoGain.connect(this.sirenOsc.frequency);
@@ -405,10 +405,12 @@ export class GameAudio {
     }
 
     // Volume grows smoothly as the police closes in; capped so the V12 stays on top
-    const near = clamp(1 - gap / 520, 0, 1);
-    const vol = 0.015 + 0.2 * near ** 1.8;
-    const lfoRate = 0.45 + near * 0.35;
-    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.22), t, 0.3);
+    const near = clamp(1 - gap / 560, 0, 1);
+    // Far = quiet, mid distance = medium, close = loud (not ear-splitting)
+    const vol = 0.07 + 0.38 * near ** 1.3;
+    // Classic wail far away, faster "yelp" when right behind you
+    const lfoRate = gap < 90 ? 2.8 : 0.3 + near * 0.25;
+    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.45), t, 0.3);
     this.sirenLfo.frequency.setTargetAtTime(lfoRate, t, 0.2);
 
     const engVol = gap < 120 ? clamp((1 - gap / 120) * 0.1, 0, 0.1) : 0;
