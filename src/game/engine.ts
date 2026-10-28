@@ -1,6 +1,6 @@
 import type { GameAudio } from "./audio";
 import { pickGear } from "./gearbox";
-import { ESCAPE_GAP, POLICE_MAX, START_DELAY, START_GAP, escapeProgress, policeSpeedStep, policeZone, type Zone } from "./police";
+import { ESCAPE_GAP, POLICE_MAX, START_DELAY, START_GAP, escapeProgress, policeSpeedStep, policeZone, isRearHit, choosePoliceLane, type Zone } from "./police";
 import { blockedLanes, isLaneClear, laneChangeOk, wallSpeedCaps, type CarType, type LaneCar, type YieldState } from "./traffic";
 import { BRIDGES, SIGN_GANTRIES, SPEED_RADARS, inTunnel, lightsOn, nightAmount, rainAmount } from "./world";
 
@@ -665,31 +665,31 @@ export class RacingEngine {
       pol.z = this.pz - START_GAP;
       pol.speed = 100;
     } else {
-      // Find cars immediately ahead of police to avoid them
+      const pLane = clamp(Math.floor((this.player.x - this.roadX) / this.laneW), 0, LANES - 1);
+      const settled = Math.abs(pol.x - this.laneX(pol.lane)) < this.laneW * 0.15;
+      // Pick a lane only once the previous change finished: overtake via free lanes, never through cars
+      if (settled) {
+        pol.targetLane = choosePoliceLane(this.traffic, { lane: pol.lane, z: pol.z }, pLane, {
+          ahead: this.lenM * 3,
+          behind: this.lenM * 1.6,
+        });
+        pol.lane = pol.targetLane;
+      }
+
+      // Respect traffic: never faster than a car right ahead in the lanes it occupies
       let speedCap = POLICE_MAX;
       for (const t of this.traffic) {
         if (t.hit) continue;
         const dz = t.z - pol.z;
-        if (dz > 0 && dz < 40 && Math.abs(t.x - pol.x) < this.carW * 0.9) {
-          speedCap = Math.min(speedCap, t.speed * 0.95);
-          // Try to steer to an adjacent open lane
-          const altLane = pol.lane === 0 ? 1 : pol.lane === 2 ? 1 : 0;
-          pol.targetLane = altLane;
+        if (dz > 0 && dz < this.lenM * 2.6 && Math.abs(t.x - pol.x) < this.carW * 0.95) {
+          speedCap = Math.min(speedCap, dz < this.lenM * 1.15 ? t.speed * 0.85 : t.speed);
         }
       }
 
       pol.speed = policeSpeedStep(pol.speed, dt, speedCap);
       pol.z += (pol.speed / 3.6) * dt;
-
-      // Police lane tracking
-      if (pol.targetLane === pol.lane && Math.random() < 0.02) {
-        // occasionally match player lane
-        const pLane = clamp(Math.floor((this.player.x - this.roadX) / this.laneW), 0, LANES - 1);
-        pol.targetLane = pLane;
-      }
-      pol.lane = pol.targetLane;
       const targetX = this.laneX(pol.lane);
-      pol.x += (targetX - pol.x) * (1 - Math.exp(-6 * dt));
+      pol.x += (targetX - pol.x) * (1 - Math.exp(-5 * dt));
     }
 
     pol.y = this.baseY - (pol.z - this.pz) * this.k;
@@ -706,7 +706,7 @@ export class RacingEngine {
         this.audio?.setPolice(999, false);
       }
       // Busted check: police catches player
-      else if (gap <= 2.5 && Math.abs(pol.x - this.player.x) < this.carW * 0.8) {
+      else if (isRearHit(gap, pol.x - this.player.x, this.lenM * 0.95, this.carW)) {
         this.phase = "busted";
         this.gameOverOutcome = "busted";
         this.crashT = 0;
