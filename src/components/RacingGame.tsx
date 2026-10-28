@@ -455,6 +455,29 @@ export function RacingGame() {
                 </div>
               </div>
             )}
+
+            {/* Near-miss combo multiplier */}
+            {playing && hud.nearMissCombo > 0 && (
+              <div className="mt-2 flex justify-center">
+                <div className="corner-cut border border-hud-border bg-hud/90 px-4 py-1 backdrop-blur-md shadow-glow">
+                  <span className="font-display text-2xl leading-none tabular-nums text-primary animate-pulse-soft">
+                    {hud.nearMissCombo}x
+                  </span>
+                  <span className="ml-2 text-[10px] font-bold tracking-widest text-muted-foreground">
+                    {t.combo}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Near-miss event popup */}
+            {playing && hud.nearMissEvent && (
+              <div className="mt-1.5 flex justify-center animate-rise-in">
+                <span className="font-display text-xl leading-none text-primary drop-shadow-md">
+                  {t.nearMiss} +{hud.nearMissEvent.pts}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
