@@ -440,8 +440,21 @@ export class RacingEngine {
         }
         p.vx = 0;
       }
+    } else if (this.phase === "busted") {
+      // PRESO: the car brakes automatically until it stops — no explosion
+      p.speed = Math.max(0, p.speed - 150 * dt);
+      p.rot *= Math.exp(-6 * dt);
+      p.spin = 0;
+      p.vx *= Math.exp(-6 * dt);
+      p.x = clamp(p.x, minX, maxX);
+      this.crashT += dt;
+      if (p.speed <= 0.5 && this.crashT > 0.5) {
+        this.phase = "over";
+        this.gameOverOutcome = "busted";
+        this.cb.onGameOver({ distance: this.distance, topSpeed: this.topSpeed, outcome: "busted" });
+      }
     } else {
-      // Crashed / Busted / Escaped ending dynamics
+      // Crashed / Escaped ending dynamics
       p.speed *= Math.exp(-1.8 * dt);
       if (p.speed < 1) p.speed = 0;
       p.rot += p.spin * dt;
@@ -460,8 +473,8 @@ export class RacingEngine {
         const r = p.h * 0.22;
         this.emitSmoke(p.x - Math.sin(p.rot) * r, this.baseY + Math.cos(p.rot) * r, this.crashT < 2 && Math.random() < 0.35);
       }
-      if ((this.phase === "crashed" || this.phase === "busted" || this.phase === "escaped") && this.crashT > 1.4) {
-        const out = this.phase === "crashed" ? "crash" : this.phase === "busted" ? "busted" : "escaped";
+      if ((this.phase === "crashed" || this.phase === "escaped") && this.crashT > 1.4) {
+        const out = this.phase === "crashed" ? "crash" : "escaped";
         this.phase = "over";
         this.gameOverOutcome = out;
         this.cb.onGameOver({ distance: this.distance, topSpeed: this.topSpeed, outcome: out });
@@ -523,7 +536,7 @@ export class RacingEngine {
           if (latDist >= minSafe && latDist <= maxClose) {
             t.nearMissed = true;
             this.nearMissCombo += 1;
-            this.comboTimer = 3.8;
+            this.comboTimer = 3.0;
             const pts = 100 * this.nearMissCombo;
             this.boostEnergy = Math.min(100, this.boostEnergy + 18);
             this.lastNearMissEvent = { combo: this.nearMissCombo, pts };
@@ -698,8 +711,9 @@ export class RacingEngine {
       const gapNow = this.pz - pol.z;
       const ps = this.player.speed;
       if (this.phase === "busted") {
-        // Roadblock done: police stops in front of the Lamborghini
-        pol.speed = this.player.speed * 0.98;
+        // Roadblock done: the GT3 RS brakes to a stop in front, no crash
+        pol.speed = Math.max(0, pol.speed - 150 * dt);
+        pol.lane = pLane;
         this.player.spin = 0;
         this.player.rot *= Math.exp(-4 * dt);
       } else {
@@ -728,15 +742,17 @@ export class RacingEngine {
       }
       pol.z += (pol.speed / 3.6) * dt;
       const targetX = this.laneX(pol.lane);
-      // Steering like a real car: lateral speed is limited by forward speed, heading follows it
+      // Realistic steering: lateral speed is limited so a lane change takes
+      // real time, and the heading follows the actual direction of travel
+      // (the car visibly turns into the lane instead of sliding sideways).
       const dx = targetX - pol.x;
-      const maxVx = this.laneW * (0.6 + Math.min(pol.speed, 200) / 110);
-      const wantVx = clamp(dx * 3.2, -maxVx, maxVx);
-      pol.vx += (wantVx - pol.vx) * (1 - Math.exp(-4 * dt));
+      const maxVx = this.laneW * (0.55 + Math.min(pol.speed, 220) / 260);
+      const wantVx = clamp(dx * 2.2, -maxVx, maxVx);
+      pol.vx += (wantVx - pol.vx) * (1 - Math.exp(-5 * dt));
       pol.x += pol.vx * dt;
-      const fwd = Math.max(40, (pol.speed / 3.6) * this.k);
-      const wantRot = clamp(Math.atan2(pol.vx, fwd), -0.45, 0.45);
-      pol.rot += (wantRot - pol.rot) * (1 - Math.exp(-8 * dt));
+      const fwd = Math.max(30, (pol.speed / 3.6) * this.k);
+      const wantRot = clamp(Math.atan2(pol.vx, fwd), -0.32, 0.32);
+      pol.rot += (wantRot - pol.rot) * (1 - Math.exp(-10 * dt));
     }
 
     pol.y = this.baseY - (pol.z - this.pz) * this.k;
@@ -757,14 +773,11 @@ export class RacingEngine {
         pol.blocking &&
         -gap > 0 &&
         -gap < this.lenM * 3 &&
-        Math.abs(pol.x - this.player.x) < this.carW * 0.75 &&
-        (-gap < this.lenM * 1.3 || (pol.holdT += dt) > 0.7 || this.player.speed < 25)
+        Math.abs(pol.x - this.player.x) < this.carW * 0.8
       ) {
         this.phase = "busted";
         this.gameOverOutcome = "busted";
         this.crashT = 0;
-        this.shake = 6;
-        this.flash = 0.4;
         this.audio?.setPolice(10, true);
       }
       // Fallback: rear contact still busts
@@ -772,7 +785,7 @@ export class RacingEngine {
         this.phase = "busted";
         this.gameOverOutcome = "busted";
         this.crashT = 0;
-        this.shake = 10;
+        this.shake = 3;
         this.audio?.setPolice(10, true);
       }
     }
