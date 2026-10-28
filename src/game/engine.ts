@@ -172,6 +172,9 @@ export class RacingEngine {
     active: false,
     blocking: false,
     passLane: 1,
+    vx: 0,
+    rot: 0,
+    holdT: 0,
   };
 
   private traffic: TrafficCar[] = [];
@@ -315,6 +318,9 @@ export class RacingEngine {
     this.police.startDelay = START_DELAY;
     this.police.active = this.mode === "police";
     this.police.blocking = false;
+    this.police.vx = 0;
+    this.police.rot = 0;
+    this.police.holdT = 0;
   }
 
   run() {
@@ -714,6 +720,7 @@ export class RacingEngine {
             pol.lane = pLane;
             pol.speed = Math.max(0, Math.min(pol.speed, ps) - 110 * dt);
           }
+          if (Math.abs(pol.x - this.player.x) > this.carW * 0.75) pol.holdT = 0;
           if (gapNow > this.lenM * 6) pol.blocking = false; // player got away
         } else {
           pol.speed = policeSpeedStep(pol.speed, dt, speedCap);
@@ -721,14 +728,22 @@ export class RacingEngine {
       }
       pol.z += (pol.speed / 3.6) * dt;
       const targetX = this.laneX(pol.lane);
-      pol.x += (targetX - pol.x) * (1 - Math.exp(-(pol.blocking ? 3.2 : 5) * dt));
+      // Steering like a real car: lateral speed is limited by forward speed, heading follows it
+      const dx = targetX - pol.x;
+      const maxVx = this.laneW * (0.6 + Math.min(pol.speed, 200) / 110);
+      const wantVx = clamp(dx * 3.2, -maxVx, maxVx);
+      pol.vx += (wantVx - pol.vx) * (1 - Math.exp(-4 * dt));
+      pol.x += pol.vx * dt;
+      const fwd = Math.max(40, (pol.speed / 3.6) * this.k);
+      const wantRot = clamp(Math.atan2(pol.vx, fwd), -0.45, 0.45);
+      pol.rot += (wantRot - pol.rot) * (1 - Math.exp(-8 * dt));
     }
 
     pol.y = this.baseY - (pol.z - this.pz) * this.k;
     const gap = this.pz - pol.z;
 
     // Siren audio modulation
-    this.audio?.setPolice(Math.abs(gap), this.phase === "playing");
+    this.audio?.setPolice(Math.abs(gap), this.phase === "playing" || this.phase === "busted");
 
     if (this.phase === "playing") {
       // Escaped check
@@ -738,7 +753,13 @@ export class RacingEngine {
         this.audio?.setPolice(999, false);
       }
       // Busted: police blocked the road right in front of the Lamborghini
-      else if (pol.blocking && -gap > 0 && -gap < this.lenM * 1.25 && Math.abs(pol.x - this.player.x) < this.carW * 0.7) {
+      else if (
+        pol.blocking &&
+        -gap > 0 &&
+        -gap < this.lenM * 3 &&
+        Math.abs(pol.x - this.player.x) < this.carW * 0.75 &&
+        (-gap < this.lenM * 1.3 || (pol.holdT += dt) > 0.7 || this.player.speed < 25)
+      ) {
         this.phase = "busted";
         this.gameOverOutcome = "busted";
         this.crashT = 0;
@@ -1591,6 +1612,7 @@ export class RacingEngine {
   private drawPoliceCar(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, headlightsOn: boolean) {
     g.save();
     g.translate(x, y);
+    g.rotate(this.police.rot);
 
     // Shadow
     g.globalAlpha = 0.55;
