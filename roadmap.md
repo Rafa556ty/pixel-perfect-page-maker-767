@@ -1,16 +1,12 @@
-# Roadmap
+# Roadmap — Versão 2.0 DEMO
 
-- [ ] Exhaust flames on some upshifts (SVJ style)
-- [ ] Horn button: horn sound, car ahead must leave the lane
-- [ ] Scenery cycle: day highway (richer) -> tunnel (dark, headlights, muffled sound) -> dusk -> night highway -> dawn
-- [ ] New traffic: bus, SUV, Mustang GT blue/black, BMW M5 white, keep room to pass
-- [ ] Traffic turn signals + natural lane changes (rare), forced on horn
-- [ ] Police Escape mode: Porsche GT3 RS, siren by distance, green/yellow/orange/red meter, win/lose screens
-- [ ] Menu button "Pintar carro / Trocar de carro" -> DEMO message
-- [ ] Gentle nightfall before the night highway
-- [ ] Check every button works
-- [ ] First-visit language picker (6 languages) + "Configurações do jogo" in menu
-- [ ] DEMO label next to title
-- [ ] Gear indicator in HUD, no delay (8-speed gearbox wired to engine + sound)
-- [ ] Hide "Edit with Lovable" badge
-- [ ] Day highway polish: signs, bridges, rails, poles, vegetation
+- [x] Import base from GitHub (Lamborghini-nova)
+- [x] Engine sound from real recorded V12 samples (idle, load, rev, redline hold) — no oscillator synth
+- [x] Shift bang + exhaust pops + flames; 8th gear holds redline loop
+- [x] Tunnel low-pass on engine, exhaust and horn
+- [x] Sound gear = HUD gear (same source)
+- [x] Police: bust only on rear hit, respects traffic, overtakes via free lanes
+- [x] Siren volume by distance, capped below the engine
+- [x] Horn yield, natural lane changes with blinkers, never 3 lanes blocked (existing, tested)
+- [x] Scenery cycle, headlights/LED tail lights (existing)
+- [x] DEMO badge, DEMO modal on paint/change car, first-visit 6-language picker (existing)
