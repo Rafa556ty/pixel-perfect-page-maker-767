@@ -170,6 +170,8 @@ export class RacingEngine {
     sirenT: 0,
     startDelay: START_DELAY,
     active: false,
+    blocking: false,
+    passLane: 1,
   };
 
   private traffic: TrafficCar[] = [];
@@ -312,6 +314,7 @@ export class RacingEngine {
     this.police.x = this.laneX(1);
     this.police.startDelay = START_DELAY;
     this.police.active = this.mode === "police";
+    this.police.blocking = false;
   }
 
   run() {
@@ -598,7 +601,7 @@ export class RacingEngine {
     this.shake *= Math.exp(-6 * dt);
     this.flash *= Math.exp(-5 * dt);
 
-    this.audio?.setEngine(playing ? p.speed : 0, (inp.gas || this.boostActive) && playing, playing || this.phase === "menu", tunnel, rain, this.currentGear - 1);
+    this.audio?.setEngine(playing ? p.speed : 0, (inp.gas || this.boostActive) && playing, playing, tunnel, rain, this.currentGear - 1);
 
     this.hudT += dt;
     if (this.hudT > 0.08) {
@@ -690,7 +693,9 @@ export class RacingEngine {
       const ps = this.player.speed;
       if (this.phase === "busted") {
         // Roadblock done: police stops in front of the Lamborghini
-        pol.speed = Math.max(0, pol.speed - 260 * dt);
+        pol.speed = this.player.speed * 0.98;
+        this.player.spin = 0;
+        this.player.rot *= Math.exp(-4 * dt);
       } else {
         // Close enough: go for a rolling roadblock (overtake beside, cut in, brake)
         if (!pol.blocking && gapNow < this.lenM * 2.2) {
