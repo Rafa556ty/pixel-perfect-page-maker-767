@@ -31,7 +31,6 @@ const LOAD_PITCH = [
 ];
 const PITCH_T0 = 0.04;
 const PITCH_DT = 0.04;
-const IDLE_HZ = 72; // fundamental firing frequency of V12 idle (6 pulses/rev at 1000 RPM ≈ 100 Hz / bank resonance ≈ 72 Hz)
 
 const SINE_WINDOW = (() => {
   const n = 64;
@@ -406,26 +405,11 @@ export class GameAudio {
       return;
     }
 
-    let vol = 0;
-    let lfoRate = 1.3;
-    if (gap >= 220) {
-      vol = 0.06 * Math.max(0, 1 - (gap - 220) / 380);
-      lfoRate = 1.2;
-    } else if (gap >= 120) {
-      const p = 1 - (gap - 120) / 100;
-      vol = 0.06 + p * 0.18;
-      lfoRate = 1.4 + p * 0.4;
-    } else if (gap >= 50) {
-      const p = 1 - (gap - 50) / 70;
-      vol = 0.24 + p * 0.28;
-      lfoRate = 1.8 + p * 1.0;
-    } else {
-      const p = 1 - Math.max(0, gap) / 50;
-      vol = 0.52 + p * 0.33;
-      lfoRate = 2.8 + p * 1.2;
-    }
-
-    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.85), t, 0.15);
+    // Volume grows smoothly as the police closes in; capped so the V12 stays on top
+    const near = clamp(1 - gap / 520, 0, 1);
+    const vol = 0.02 + 0.36 * near ** 1.7;
+    const lfoRate = 1.2 + near * 2.4;
+    this.policeGain.gain.setTargetAtTime(clamp(vol, 0, 0.4), t, 0.25);
     this.sirenLfo.frequency.setTargetAtTime(lfoRate, t, 0.2);
 
     const engVol = gap < 120 ? clamp((1 - gap / 120) * 0.22, 0, 0.22) : 0;
@@ -512,6 +496,20 @@ export class GameAudio {
     s.gain.linearRampToValueAtTime(1, t + 0.16);
     this.pop(t + 0.02, 0.65);
     this.pop(t + 0.06, 0.45);
+    // Real mechanical "bang" of the shift: short slice of the recorded rev blip
+    const ctx = this.ctx;
+    if (ctx && this.revBuf && this.master) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.revBuf;
+      src.playbackRate.value = 1.15;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.55, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      src.connect(g);
+      g.connect(this.master);
+      src.start(t, 0.3, 0.16);
+    }
   }
 
   setEngine(speed: number, throttle: boolean, running: boolean, inTunnel = false, rain = 0, gear?: number) {

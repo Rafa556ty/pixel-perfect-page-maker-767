@@ -598,7 +598,7 @@ export class RacingEngine {
     this.shake *= Math.exp(-6 * dt);
     this.flash *= Math.exp(-5 * dt);
 
-    this.audio?.setEngine(playing ? p.speed : 0, (inp.gas || this.boostActive) && playing, playing || this.phase === "menu", tunnel, rain);
+    this.audio?.setEngine(playing ? p.speed : 0, (inp.gas || this.boostActive) && playing, playing || this.phase === "menu", tunnel, rain, this.currentGear - 1);
 
     this.hudT += dt;
     if (this.hudT > 0.08) {
