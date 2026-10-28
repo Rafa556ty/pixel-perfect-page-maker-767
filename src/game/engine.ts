@@ -686,17 +686,44 @@ export class RacingEngine {
         }
       }
 
-      pol.speed = policeSpeedStep(pol.speed, dt, speedCap);
+      const gapNow = this.pz - pol.z;
+      const ps = this.player.speed;
+      if (this.phase === "busted") {
+        // Roadblock done: police stops in front of the Lamborghini
+        pol.speed = Math.max(0, pol.speed - 260 * dt);
+      } else {
+        // Close enough: go for a rolling roadblock (overtake beside, cut in, brake)
+        if (!pol.blocking && gapNow < this.lenM * 2.2) {
+          pol.blocking = true;
+          const side = pLane === 0 ? 1 : pLane === LANES - 1 ? LANES - 2 : pol.lane !== pLane ? pol.lane : pLane + (Math.random() < 0.5 ? -1 : 1);
+          pol.passLane = side;
+        }
+        if (pol.blocking) {
+          const ahead = pol.z - this.pz;
+          if (ahead < this.lenM * 1.4) {
+            // Pull alongside in the free lane and overtake
+            pol.lane = pol.passLane;
+            pol.speed = Math.min(340, Math.max(pol.speed, ps + 45));
+          } else {
+            // In front: cut into the player's lane and brake hard
+            pol.lane = pLane;
+            pol.speed = Math.max(0, Math.min(pol.speed, ps) - 110 * dt);
+          }
+          if (gapNow > this.lenM * 6) pol.blocking = false; // player got away
+        } else {
+          pol.speed = policeSpeedStep(pol.speed, dt, speedCap);
+        }
+      }
       pol.z += (pol.speed / 3.6) * dt;
       const targetX = this.laneX(pol.lane);
-      pol.x += (targetX - pol.x) * (1 - Math.exp(-5 * dt));
+      pol.x += (targetX - pol.x) * (1 - Math.exp(-(pol.blocking ? 3.2 : 5) * dt));
     }
 
     pol.y = this.baseY - (pol.z - this.pz) * this.k;
     const gap = this.pz - pol.z;
 
     // Siren audio modulation
-    this.audio?.setPolice(gap, this.phase === "playing");
+    this.audio?.setPolice(Math.abs(gap), this.phase === "playing");
 
     if (this.phase === "playing") {
       // Escaped check
@@ -705,14 +732,21 @@ export class RacingEngine {
         this.gameOverOutcome = "escaped";
         this.audio?.setPolice(999, false);
       }
-      // Busted check: police catches player
-      else if (isRearHit(gap, pol.x - this.player.x, this.lenM * 0.95, this.carW)) {
+      // Busted: police blocked the road right in front of the Lamborghini
+      else if (pol.blocking && -gap > 0 && -gap < this.lenM * 1.25 && Math.abs(pol.x - this.player.x) < this.carW * 0.7) {
         this.phase = "busted";
         this.gameOverOutcome = "busted";
         this.crashT = 0;
-        this.shake = 14;
-        this.flash = 0.9;
-        this.audio?.crash();
+        this.shake = 6;
+        this.flash = 0.4;
+        this.audio?.setPolice(10, true);
+      }
+      // Fallback: rear contact still busts
+      else if (!pol.blocking && isRearHit(gap, pol.x - this.player.x, this.lenM * 0.95, this.carW)) {
+        this.phase = "busted";
+        this.gameOverOutcome = "busted";
+        this.crashT = 0;
+        this.shake = 10;
         this.audio?.setPolice(10, true);
       }
     }
