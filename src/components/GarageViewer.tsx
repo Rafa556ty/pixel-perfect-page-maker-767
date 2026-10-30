@@ -228,8 +228,27 @@ export function GarageViewer({
       keyLight.shadow.camera.bottom = -shadowSpan;
       keyLight.shadow.camera.updateProjectionMatrix();
 
-      const target = new THREE.Vector3(0, carHeight * 0.42, 0);
-      camera.position.set(carLength * 0.86, carHeight * 1.6, carLength * 1.02);
+      const target = new THREE.Vector3(0, carHeight * 0.45, 0);
+      const viewDirection = new THREE.Vector3(0.68, 0.34, 0.65).normalize();
+
+      /**
+       * Distance that keeps the whole car inside the frame. A phone held
+       * upright is tall and narrow, so the horizontal field of view is the one
+       * that clips the car: it is derived from the FOV and the current aspect.
+       */
+      const frameDistance = () => {
+        const halfVertical = Math.tan((camera.fov * Math.PI) / 360);
+        const halfHorizontal = halfVertical * camera.aspect;
+        return (
+          Math.max(
+            carLength / 2 / halfHorizontal,
+            carHeight / 2 / halfVertical,
+          ) * 1.12
+        );
+      };
+
+      let baseDistance = frameDistance();
+      camera.position.copy(target).addScaledVector(viewDirection, baseDistance);
       camera.lookAt(target);
 
       const controls = new OrbitControls(camera, canvas);
@@ -239,9 +258,9 @@ export function GarageViewer({
       controls.enablePan = false;
       controls.autoRotate = true;
       controls.autoRotateSpeed = 0.85;
-      controls.minDistance = carLength * 0.62;
-      controls.maxDistance = carLength * 3.4;
-      controls.minPolarAngle = Math.PI * 0.1;
+      controls.minDistance = baseDistance * 0.4;
+      controls.maxDistance = baseDistance * 2.4;
+      controls.minPolarAngle = Math.PI * 0.12;
       controls.maxPolarAngle = Math.PI * 0.495;
       controls.update();
 
