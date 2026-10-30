@@ -69,6 +69,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "RADAR",
     speedWarning: "FOTOGRAFADO!",
+    garage: "GARAGEM",
+    garageHint: "Arraste para girar • pinça ou roda do mouse para chegar mais perto",
+    garageLoading: "Carregando o carro",
+    garageError: "O carro não pôde ser carregado",
   },
   "pt-PT": {
     brand: "LAMBORGHINI",
@@ -123,6 +127,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "RADAR",
     speedWarning: "FOTOGRAFADO!",
+    garage: "GARAGEM",
+    garageHint: "Arrasta para girar • pinça ou roda do rato para te aproximares",
+    garageLoading: "A carregar o carro",
+    garageError: "Não foi possível carregar o carro",
   },
   en: {
     brand: "LAMBORGHINI",
@@ -177,6 +185,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "SPEED TRAP",
     speedWarning: "CAMERA FLASH!",
+    garage: "GARAGE",
+    garageHint: "Drag to spin • pinch or scroll to zoom in",
+    garageLoading: "Loading the car",
+    garageError: "The car could not be loaded",
   },
   it: {
     brand: "LAMBORGHINI",
@@ -231,6 +243,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "AUTOVELOX",
     speedWarning: "FOTO AUTOVELOX!",
+    garage: "OFFICINA",
+    garageHint: "Trascina per girare • pizzica o scorri per avvicinarti",
+    garageLoading: "Caricamento dell'auto",
+    garageError: "Impossibile caricare l'auto",
   },
   fr: {
     brand: "LAMBORGHINI",
@@ -285,6 +301,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "RADAR",
     speedWarning: "FLASH RADAR!",
+    garage: "GARAGE",
+    garageHint: "Fais glisser pour faire tourner • pince ou molette pour zoomer",
+    garageLoading: "Chargement de la voiture",
+    garageError: "La voiture n'a pas pu être chargée",
   },
   ja: {
     brand: "LAMBORGHINI",
@@ -339,6 +359,10 @@ export const TRANSLATIONS = {
     combo: "COMBO",
     speedCamera: "速度監視カメラ",
     speedWarning: "速度違反フラッシュ!",
+    garage: "ガレージ",
+    garageHint: "ドラッグで回転 • ピンチやホイールでズーム",
+    garageLoading: "車両を読み込み中",
+    garageError: "車両を読み込めませんでした",
   },
 };
 
