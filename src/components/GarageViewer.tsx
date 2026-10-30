@@ -202,34 +202,6 @@ export function GarageViewer({
       const center = bounds.getCenter(new THREE.Vector3());
       pivot.position.set(-center.x, -bounds.min.y, -center.z);
       pivot.updateMatrixWorld(true);
-      const probe = (match: (label: string) => boolean) => {
-        const b = new THREE.Box3();
-        let found = false;
-        car.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          if (!mesh.isMesh) return;
-          const label = `${(mesh.material as { name?: string })?.name ?? ""} ${mesh.name}`.toLowerCase();
-          if (!match(label)) return;
-          b.expandByObject(mesh);
-          found = true;
-        });
-        return found
-          ? {
-              y: [+b.min.y.toFixed(2), +b.max.y.toFixed(2)],
-              x: [+b.min.x.toFixed(2), +b.max.x.toFixed(2)],
-              z: [+b.min.z.toFixed(2), +b.max.z.toFixed(2)],
-            }
-          : null;
-      };
-      console.log(
-        "GARAGE-PROBE",
-        JSON.stringify({
-          size: { x: +size.x.toFixed(2), y: +size.y.toFixed(2), z: +size.z.toFixed(2) },
-          tire: probe((l) => l.includes("tire")),
-          body: probe((l) => l.includes("body")),
-          interior: probe((l) => l.includes("interior")),
-        }),
-      );
 
       const carLength = Math.max(size.x, size.z);
       const carHeight = Math.max(0.4, size.y);
