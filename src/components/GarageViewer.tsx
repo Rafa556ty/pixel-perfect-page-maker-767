@@ -101,7 +101,7 @@ export function GarageViewer({
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.15;
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
       const canvas = renderer.domElement;
       canvas.style.display = "block";
       canvas.style.width = "100%";
@@ -176,7 +176,7 @@ export function GarageViewer({
         const mesh = obj as THREE.Mesh;
         if (!mesh.isMesh) return;
         const label = `${(mesh.material as { name?: string })?.name ?? ""} ${mesh.name}`.toLowerCase();
-        const weight = mesh.geometry?.attributes?.position?.count ?? 1;
+        const weight = mesh.geometry?.attributes?.["position"]?.count ?? 1;
         const center = lampBox.setFromObject(mesh).getCenter(new THREE.Vector3());
         if (label.includes("tail")) {
           tail.addScaledVector(center, weight);
