@@ -150,8 +150,8 @@ export function GarageViewer({
       if (disposed) return;
 
       const car = gltf.scene;
-      // This model was authored with Z up; three.js expects Y up.
-      car.rotation.x = -Math.PI / 2;
+      // glTF is always Y up and this file's root node already carries the
+      // exporter's axis conversion, so the model needs no re-orientation here.
 
       const pivot = new THREE.Group();
       pivot.add(car);
