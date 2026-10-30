@@ -22,6 +22,7 @@ import {
   Trophy,
   Flame,
   SunMedium,
+  Car,
   Camera,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ import bullEmblem from "@/assets/bull-emblem.png";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { GarageViewer } from "@/components/GarageViewer";
 import { GameAudio } from "@/game/audio";
 import {
   MAX_SPEED,
@@ -137,6 +139,7 @@ export function RacingGame() {
   const [showFirstLangModal, setShowFirstLangModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
+  const [showGarage, setShowGarage] = useState(false);
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS["pt-BR"];
 
@@ -682,6 +685,16 @@ export function RacingGame() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-full border-primary/40 bg-hud/80 text-foreground hover:bg-secondary text-xs"
+                  onClick={() => setShowGarage(true)}
+                >
+                  <Car className="size-3.5 mr-1.5 text-primary" />
+                  {t.garage}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="w-full border-hud-border bg-hud/80 text-foreground hover:bg-secondary text-xs"
                   onClick={() => setShowDemoModal(true)}
                 >
@@ -806,6 +819,19 @@ export function RacingGame() {
               CARREGANDO
             </p>
           </div>
+        )}
+
+        {showGarage && (
+          <GarageViewer
+            labels={{
+              title: t.garage,
+              hint: t.garageHint,
+              loading: t.garageLoading,
+              error: t.garageError,
+              close: t.close,
+            }}
+            onClose={() => setShowGarage(false)}
+          />
         )}
 
         {/* Requirement 7: Demo Alert Dialog ("Pintar carro, trocar de carro") */}
