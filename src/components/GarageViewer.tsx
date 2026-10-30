@@ -285,6 +285,18 @@ export function GarageViewer({
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+
+        // Keep the whole car framed through a rotation, but leave a zoom the
+        // player already made alone.
+        const next = frameDistance();
+        const current = camera.position.distanceTo(controls.target);
+        if (Math.abs(current - baseDistance) < 0.01) {
+          const dir = camera.position.clone().sub(controls.target).normalize();
+          camera.position.copy(controls.target).addScaledVector(dir, next);
+        }
+        baseDistance = next;
+        controls.minDistance = baseDistance * 0.4;
+        controls.maxDistance = baseDistance * 2.4;
       };
       const observer = new ResizeObserver(resize);
       observer.observe(container);
